@@ -276,6 +276,8 @@ const startServer = async () => {
   app.use('/api/search', routes.search);
   app.use('/api/messages', routes.messages);
   app.use('/api/convos', routes.convos);
+  app.use('/api/retrieval', routes.retrieval);
+  app.use('/api/graph', routes.graph);
   app.use('/api/presets', routes.presets);
   app.use('/api/projects', routes.projects);
   app.use('/api/prompts', routes.prompts);

@@ -173,5 +173,12 @@
         "optional": true
       }
     ]
-  }
+  },
+  {
+      "name": "Graph Paper Retrieval",
+      "pluginKey": "graph_retrieval",
+      "description": "Searches your science-paper knowledge graph backend and returns relevant papers with citations.",
+      "icon": "https://raw.githubusercontent.com/KaloyanDimitrov73/LibreChatGraphUI/main/client/public/assets/logo.svg",
+      "authConfig": []
+    }
 ]

@@ -19,6 +19,7 @@ export * from './subagents';
 export * from './sandbox';
 export * from './usage';
 export * from './steer';
+export * from './graph';
 
 export default {
   ...artifacts,

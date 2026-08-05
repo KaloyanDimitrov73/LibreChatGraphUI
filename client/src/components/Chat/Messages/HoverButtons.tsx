@@ -8,6 +8,8 @@ import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
 import { cn } from '~/utils';
 import store from '~/store';
+import { Waypoints } from 'lucide-react';
+import { emitGraphEvent } from '~/hooks/Graph/useGraphEvents';
 
 type THoverButtons = {
   isEditing: boolean;
@@ -256,7 +258,21 @@ const HoverButtons = ({
       {!isCreatedByUser && handleFeedback != null && (
         <Feedback handleFeedback={handleFeedback} feedback={message.feedback} isLast={isLast} />
       )}
-
+      {/* Graph View Button */}
+      {!isCreatedByUser && (
+        <HoverButton
+          onClick={() =>
+            emitGraphEvent('chat:view-graph', {
+              conversationId: conversation.conversationId,
+              messageId: message.messageId,
+            })
+          }
+          title="View in graph"
+          icon={<Waypoints size={19} />}
+          isLast={isLast}
+          dataTestId={isLast ? 'view-graph-button' : undefined}
+        />
+      )}
       {/* Regenerate Button */}
       {regenerateEnabled && (
         <HoverButton
