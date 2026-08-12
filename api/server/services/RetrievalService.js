@@ -1,64 +1,90 @@
 const axios = require('axios');
-const { logger } = require('~/config');
 
-const RETRIEVAL_API_URL = process.env.RETRIEVAL_API_URL;
-const RETRIEVAL_API_KEY = process.env.RETRIEVAL_API_KEY;
-const DEFAULT_TOP_K = Number(process.env.RETRIEVAL_DEFAULT_TOP_K) || 8;
-const DEFAULT_THRESHOLD = Number(process.env.RETRIEVAL_DEFAULT_THRESHOLD) || 0.75;
-const DEFAULT_TIMEOUT_MS = Number(process.env.RETRIEVAL_TIMEOUT_MS) || 15000;
+const BASE = process.env.RETRIEVAL_API_URL || process.env.RETRIEVAL_URL || '';
 
-function getClient() {
-  if (!RETRIEVAL_API_URL) {
-    throw new Error(
-      'RETRIEVAL_API_URL is not configured. Set it in your .env to point at your retrieval backend.',
-    );
-  }
-  return axios.create({
-    baseURL: RETRIEVAL_API_URL,
-    timeout: DEFAULT_TIMEOUT_MS,
-    headers: RETRIEVAL_API_KEY ? { Authorization: `Bearer ${RETRIEVAL_API_KEY}` } : {},
-  });
+if (!BASE) {
+  console.warn('RETRIEVAL_API_URL not set — RetrievalService requests will fail until configured.');
 }
 
-async function performRetrievalSearch({ query, topK, similarityThreshold, corpus, settings }) {
-  const client = getClient();
-  const body = {
-    query,
-    top_k: topK ?? settings?.topK ?? DEFAULT_TOP_K,
-    similarity_threshold: similarityThreshold ?? settings?.similarityThreshold ?? DEFAULT_THRESHOLD,
-    corpus: corpus || settings?.corpus || undefined,
-  };
-  try {
-    const { data } = await client.post('/search', body);
-    return data;
-  } catch (err) {
-    logger.error('[RetrievalService] search failed:', err?.response?.data || err.message);
-    throw new Error('Retrieval backend search request failed');
+const client = axios.create({
+  baseURL: BASE,
+  timeout: 30_000,
+});
+
+// normalize errors
+function wrapError(err) {
+  if (err.response) {
+    const { status, data } = err.response;
+    const e = new Error(`RetrievalService error ${status}: ${JSON.stringify(data)}`);
+    e.status = status;
+    e.payload = data;
+    return e;
   }
+  return err;
 }
 
-async function getNode(nodeId) {
-  const client = getClient();
-  try {
-    const { data } = await client.get(`/nodes/${encodeURIComponent(nodeId)}`);
-    return data;
-  } catch (err) {
-    logger.error('[RetrievalService] getNode failed:', err?.response?.data || err.message);
-    throw new Error('Retrieval backend node lookup failed');
-  }
-}
+module.exports = {
+  async search(query, options = {}) {
+    // POST /search { query, topK, filters }
+    try {
+      const body = Object.assign({ query }, options);
+      const res = await client.post('/search', body);
+      return res.data;
+    } catch (err) {
+      throw wrapError(err);
+    }
+  },
 
-async function getNodeNeighbors(nodeId, depth = 1) {
-  const client = getClient();
-  try {
-    const { data } = await client.get(`/nodes/${encodeURIComponent(nodeId)}/neighbors`, {
-      params: { depth },
-    });
-    return data;
-  } catch (err) {
-    logger.error('[RetrievalService] getNodeNeighbors failed:', err?.response?.data || err.message);
-    throw new Error('Retrieval backend neighbor lookup failed');
-  }
-}
+  async ask(question, options = {}) {
+    // POST /qa/ask { question, context, settings }
+    try {
+      const body = Object.assign({ question }, options);
+      const res = await client.post('/qa/ask', body);
+      return res.data;
+    } catch (err) {
+      throw wrapError(err);
+    }
+  },
 
-module.exports = { performRetrievalSearch, getNode, getNodeNeighbors };
+  async askStream(question, options = {}, onChunk) {
+    // If the remote supports SSE/streaming, hit /qa/ask/stream and call onChunk for each chunk.
+    const url = '/qa/ask/stream';
+    try {
+      const res = await client({
+        method: 'post',
+        url,
+        data: Object.assign({ question }, options),
+        responseType: 'stream',
+      });
+
+      const stream = res.data;
+      stream.on('data', (chunk) => {
+        if (onChunk) onChunk(chunk.toString());
+      });
+      return new Promise((resolve, reject) => {
+        stream.on('end', () => resolve());
+        stream.on('error', reject);
+      });
+    } catch (err) {
+      throw wrapError(err);
+    }
+  },
+
+  async getNode(nodeId) {
+    try {
+      const res = await client.get(`/graph/node/${encodeURIComponent(nodeId)}`);
+      return res.data;
+    } catch (err) {
+      throw wrapError(err);
+    }
+  },
+
+  async getNeighbors(nodeId, options = {}) {
+    try {
+      const res = await client.post(`/graph/node/${encodeURIComponent(nodeId)}/neighbors`, options);
+      return res.data;
+    } catch (err) {
+      throw wrapError(err);
+    }
+  },
+};
