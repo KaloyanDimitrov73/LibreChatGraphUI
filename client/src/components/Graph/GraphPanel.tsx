@@ -1,66 +1,118 @@
-import { useRecoilState, useRecoilValue } from 'recoil';
-import { X, RefreshCw } from 'lucide-react';
-import GraphCanvas from './GraphCanvas';
-import NodeDetailPanel from './NodeDetailPanel';
-import { useGraphDataQuery } from '~/data-provider/Graph/queries';
-import { useGraphEvent, emitGraphEvent } from '~/hooks/Graph/useGraphEvents';
-import store from '~/store/graph';
-import type { TGraphNode } from '~/common/graph-types';
+import React, { useEffect, useState } from 'react';
+import './GraphPanel.css'; // you can style as needed
 
-export default function GraphPanel() {
-  const [isOpen, setIsOpen] = useRecoilState(store.graphPanelOpen);
-  const [selectedNodeId, setSelectedNodeId] = useRecoilState(store.graphSelectedNodeId);
-  const width = useRecoilValue(store.graphPanelWidth);
+type Node = {
+  id: string;
+  label?: string;
+  meta?: any;
+};
 
-  const { data, isLoading, isError, refetch, isFetching } = useGraphDataQuery();
+export type GraphPanelProps = {
+  visible?: boolean;
+  onToggle?: (visible: boolean) => void;
+  onNodeClick?: (node: Node) => void;
+};
 
-  // Interop: a click on a chat-side node reference opens the panel and
-  // selects that node, which triggers the REST detail fetch automatically.
-  useGraphEvent('chat:view-graph', () => setIsOpen(true));
+export default function GraphPanel({ visible = false, onToggle, onNodeClick }: GraphPanelProps) {
+  const [open, setOpen] = useState(visible);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [selected, setSelected] = useState<Node | null>(null);
 
-  if (!isOpen) return null;
+  useEffect(() => setOpen(visible), [visible]);
+
+  async function loadRoot() {
+    try {
+      const resp = await fetch('/api/graph/node/root'); // your backend should provide a root or initial graph
+      if (!resp.ok) throw new Error('Failed to load graph root');
+      const data = await resp.json();
+      setNodes(data.nodes || []);
+    } catch (err) {
+      console.error('GraphPanel loadRoot', err);
+    }
+  }
+
+  useEffect(() => {
+    if (open) loadRoot();
+  }, [open]);
+
+  async function handleNodeClick(n: Node) {
+    setSelected(n);
+    if (onNodeClick) onNodeClick(n);
+
+    // optionally fetch more info for inspector panel
+    try {
+      const resp = await fetch(`/api/retrieval/node/${encodeURIComponent(n.id)}`);
+      if (resp.ok) {
+        const meta = await resp.json();
+        setSelected({ ...n, meta });
+      }
+    } catch (err) {
+      console.warn('node detail fetch failed', err);
+    }
+  }
 
   return (
-    <aside
-      style={{ width }}
-      className="flex h-full flex-shrink-0 flex-col border-l border-border-medium bg-surface-primary"
-      aria-label="Graph view"
-    >
-      <header className="flex items-center justify-between border-b border-border-light px-3 py-2">
-        <h2 className="text-sm font-semibold text-text-primary">Graph</h2>
-        <div className="flex items-center gap-1">
-          <button type="button" onClick={() => refetch()} aria-label="Refresh graph" className="rounded p-1 hover:bg-surface-hover">
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              emitGraphEvent('graph:panel-closed', undefined);
-            }}
-            aria-label="Close graph panel"
-            className="rounded p-1 hover:bg-surface-hover"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <aside className={`graph-panel ${open ? 'open' : 'closed'}`}>
+      <div className="graph-header">
+        <button
+          aria-label="toggle-graph-panel"
+          onClick={() => {
+            const next = !open;
+            setOpen(next);
+            if (onToggle) onToggle(next);
+          }}
+        >
+          {open ? 'Hide Graph' : 'Show Graph'}
+        </button>
+      </div>
+
+      {open && (
+        <div className="graph-body">
+          <div className="node-list">
+            {nodes.length === 0 && <div className="empty">No nodes loaded</div>}
+            {nodes.map((n) => (
+              <div key={n.id} className="node-item" onClick={() => handleNodeClick(n)}>
+                <strong>{n.label || n.id}</strong>
+                <div className="node-meta">{n.meta?.short ?? ''}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="node-inspector">
+            {selected ? (
+              <>
+                <h4>{selected.label || selected.id}</h4>
+                <pre style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(selected.meta, null, 2)}</pre>
+                <button
+                  onClick={async () => {
+                    // Ask retrieval backend for neighbors and expand
+                    try {
+                      const resp = await fetch(`/api/retrieval/node/${encodeURIComponent(selected.id)}/neighbors`, {
+                        method: 'POST',
+                      });
+                      if (resp.ok) {
+                        const data = await resp.json();
+                        // merge new nodes
+                        setNodes((prev) => {
+                          const ids = new Set(prev.map((p) => p.id));
+                          const extras = (data.nodes || []).filter((m) => !ids.has(m.id));
+                          return prev.concat(extras);
+                        });
+                      }
+                    } catch (err) {
+                      console.warn('expand neighbors failed', err);
+                    }
+                  }}
+                >
+                  Load Neighbors
+                </button>
+              </>
+            ) : (
+              <div>Select a node to inspect</div>
+            )}
+          </div>
         </div>
-      </header>
-
-      <div className="min-h-0 flex-1 overflow-hidden">
-        {isLoading && <div className="p-4 text-sm text-text-secondary">Loading graph…</div>}
-        {isError && <div className="p-4 text-sm text-red-500">Could not load graph data.</div>}
-        {data && (
-          <GraphCanvas
-            data={data}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={(node: TGraphNode) => setSelectedNodeId(node.id)}
-          />
-        )}
-      </div>
-
-      <div className="max-h-56 flex-shrink-0 overflow-y-auto border-t border-border-light">
-        <NodeDetailPanel nodeId={selectedNodeId} />
-      </div>
+      )}
     </aside>
   );
 }
