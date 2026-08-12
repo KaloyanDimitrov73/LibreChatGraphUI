@@ -1,83 +1,60 @@
 const express = require('express');
-const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
-const { logger } = require('~/config');
-const RetrievalSettings = require('~/models/RetrievalSettings');
-const {
-  performRetrievalSearch,
-  getNode,
-  getNodeNeighbors,
-} = require('~/server/services/RetrievalService');
+const RetrievalService = require('../services/RetrievalService');
 
 const router = express.Router();
-router.use(requireJwtAuth);
 
-router.get('/settings', async (req, res) => {
+// POST /api/retrieval/search
+router.post('/search', async (req, res, next) => {
   try {
-    let settings = await RetrievalSettings.findOne({ user: req.user.id });
-    if (!settings) {
-      settings = await RetrievalSettings.create({ user: req.user.id });
-    }
-    res.status(200).json(settings);
+    const { query, ...opts } = req.body || {};
+    const result = await RetrievalService.search(query, opts);
+    res.json(result);
   } catch (err) {
-    logger.error('[/api/retrieval/settings GET]', err);
-    res.status(500).json({ error: 'Failed to load retrieval settings' });
+    next(err);
   }
 });
 
-router.put('/settings', async (req, res) => {
+// POST /api/retrieval/ask
+router.post('/ask', async (req, res, next) => {
   try {
-    const { topK, similarityThreshold, corpus, autoRetrieve } = req.body ?? {};
-    const update = {};
-    if (topK !== undefined) update.topK = topK;
-    if (similarityThreshold !== undefined) update.similarityThreshold = similarityThreshold;
-    if (corpus !== undefined) update.corpus = corpus;
-    if (autoRetrieve !== undefined) update.autoRetrieve = autoRetrieve;
-
-    const settings = await RetrievalSettings.findOneAndUpdate(
-      { user: req.user.id },
-      { $set: update },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    );
-    res.status(200).json(settings);
+    const { question, ...opts } = req.body || {};
+    const result = await RetrievalService.ask(question, opts);
+    res.json(result);
   } catch (err) {
-    logger.error('[/api/retrieval/settings PUT]', err);
-    res.status(400).json({ error: 'Failed to update retrieval settings' });
+    next(err);
   }
 });
 
-router.post('/search', async (req, res) => {
+// POST /api/retrieval/ask/stream -> streams back; for now we proxy as plain-stream
+router.post('/ask/stream', async (req, res, next) => {
   try {
-    const { query, topK, similarityThreshold, corpus } = req.body ?? {};
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({ error: 'query is required' });
-    }
-    const settings = await RetrievalSettings.findOne({ user: req.user.id });
-    const results = await performRetrievalSearch({ query, topK, similarityThreshold, corpus, settings });
-    res.status(200).json(results);
+    res.setHeader('Content-Type', 'text/event-stream');
+    await RetrievalService.askStream(req.body.question, req.body.options || {}, (chunk) => {
+      res.write(`data: ${chunk}\n\n`);
+    });
+    res.end();
   } catch (err) {
-    logger.error('[/api/retrieval/search POST]', err);
-    res.status(502).json({ error: err.message || 'Retrieval backend request failed' });
+    next(err);
   }
 });
 
-router.get('/node/:id', async (req, res) => {
+// GET /api/retrieval/node/:id
+router.get('/node/:id', async (req, res, next) => {
   try {
-    const node = await getNode(req.params.id);
-    res.status(200).json(node);
+    const node = await RetrievalService.getNode(req.params.id);
+    res.json(node);
   } catch (err) {
-    logger.error('[/api/retrieval/node/:id GET]', err);
-    res.status(502).json({ error: 'Failed to load node detail' });
+    next(err);
   }
 });
 
-router.get('/node/:id/neighbors', async (req, res) => {
+// POST /api/retrieval/node/:id/neighbors
+router.post('/node/:id/neighbors', async (req, res, next) => {
   try {
-    const depth = req.query.depth ? Number(req.query.depth) : 1;
-    const neighbors = await getNodeNeighbors(req.params.id, depth);
-    res.status(200).json(neighbors);
+    const neighbors = await RetrievalService.getNeighbors(req.params.id, req.body || {});
+    res.json(neighbors);
   } catch (err) {
-    logger.error('[/api/retrieval/node/:id/neighbors GET]', err);
-    res.status(502).json({ error: 'Failed to load node neighbors' });
+    next(err);
   }
 });
 
