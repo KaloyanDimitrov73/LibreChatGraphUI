@@ -1,13 +1,25 @@
 const express = require('express');
-const { requireJwtAuth } = require('~/server/middleware');
-const { getGraphData, getGraphNode } = require('~/server/controllers/GraphController');
+const RetrievalService = require('../services/RetrievalService');
 
 const router = express.Router();
 
-// Same auth as the rest of the authenticated API surface; drop this line if the data should be public.
-router.use(requireJwtAuth);
+// Minimal graph endpoints used by the UI to load nodes/neighbors
+router.get('/node/:id', async (req, res, next) => {
+  try {
+    const node = await RetrievalService.getNode(req.params.id);
+    res.json(node);
+  } catch (err) {
+    next(err);
+  }
+});
 
-router.get('/', getGraphData);
-router.get('/nodes/:nodeId', getGraphNode);
+router.post('/node/:id/neighbors', async (req, res, next) => {
+  try {
+    const neighbors = await RetrievalService.getNeighbors(req.params.id, req.body || {});
+    res.json(neighbors);
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
