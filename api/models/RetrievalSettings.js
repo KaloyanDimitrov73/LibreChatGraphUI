@@ -1,25 +1,13 @@
 const mongoose = require('mongoose');
 
-/**
- * Per-user settings for the custom graph/paper retrieval backend.
- * One document per user; created lazily on first GET /api/retrieval/settings.
- */
-const retrievalSettingsSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      unique: true,
-      index: true,
-    },
-    topK: { type: Number, default: 8, min: 1, max: 50 },
-    similarityThreshold: { type: Number, default: 0.75, min: 0, max: 1 },
-    corpus: { type: String, default: '', trim: true },
-    autoRetrieve: { type: Boolean, default: true },
-  },
-  { timestamps: true },
-);
+const RetrievalSettingsSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true, unique: true },
+  topK: { type: Number, default: 5 },
+  similarityThreshold: { type: Number, default: 0.7 },
+  corpus: { type: String, default: 'default' },
+  autoRetrieve: { type: Boolean, default: true },
+  llmModel: { type: String, default: '' }, // optional model override
+  updatedAt: { type: Date, default: Date.now },
+});
 
-module.exports =
-  mongoose.models.RetrievalSettings || mongoose.model('RetrievalSettings', retrievalSettingsSchema);
+module.exports = mongoose.model('RetrievalSettings', RetrievalSettingsSchema);
