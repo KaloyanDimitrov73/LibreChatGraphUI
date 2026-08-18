@@ -1,4 +1,4 @@
-const { StructuredTool } = require('langchain/tools');
+const { StructuredTool } = require('@librechat/agents/langchain/tools');
 const { z } = require('zod');
 const { logger } = require('~/config');
 const { performRetrievalSearch } = require('~/server/services/RetrievalService');

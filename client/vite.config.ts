@@ -179,6 +179,8 @@ export default defineConfig(({ command }) => ({
   ],
   optimizeDeps: {
     include: [
+      'react-window', 
+      'react-vtree',
       'vite-plugin-node-polyfills/shims/buffer',
       'vite-plugin-node-polyfills/shims/process',
       'vite-plugin-node-polyfills/shims/global',

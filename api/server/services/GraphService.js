@@ -11,7 +11,10 @@ const edges = [
   { id: 'e3', source: 'n1', target: 'n4', label: 'calls' },
 ];
 
-async function getGraph() {
+async function getGraph({ conversationId, messageId } = {}) {
+  // TODO: once RETRIEVAL_API_URL is configured, scope this to the given
+  // conversationId/messageId via the real HubLink retrieval backend instead
+  // of returning the same static graph for every request.
   return { nodes: nodes.map(({ description, properties, ...rest }) => rest), edges };
 }
 

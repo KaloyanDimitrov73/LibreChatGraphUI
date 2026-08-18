@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
 import { Outlet } from 'react-router-dom';
-import { useMediaQuery } from '@librechat/client';
+import { useDefaultLayout } from 'react-resizable-panels';
+import { useMediaQuery, ResizablePanelGroup, ResizablePanel } from '@librechat/client';
 import { UnifiedSidebar } from '~/components/UnifiedSidebar';
-import GraphPanel from '~/components/Graph/GraphPanel';
+import GraphPanelContainer from '~/components/Graph/GraphPanelContainer';
 import {
   PromptGroupsProvider,
   AssistantsMapContext,
@@ -43,6 +44,12 @@ export default function Root() {
   const [bannerHeight, setBannerHeight] = useState(0);
   const sidebarExpanded = useRecoilValue(store.sidebarExpanded);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
+
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: 'root-graph-layout',
+    panelIds: ['main-view', 'graph-panel'],
+    storage: localStorage,
+  });
 
   const { isAuthenticated, logout } = useAuthContext();
 
@@ -87,18 +94,27 @@ export default function Root() {
               <Banner onHeightChange={setBannerHeight} />
                 <div className="relative z-0 flex h-full w-full overflow-hidden">
                   <UnifiedSidebar />
-                  <div
-                    className="relative flex h-full max-w-full flex-1 flex-col overflow-hidden"
-                    style={{
-                      transform:
-                        isSmallScreen && sidebarExpanded ? 'translateX(min(85vw, 380px))' : 'none',
-                      transition: 'transform 300ms cubic-bezier(0.2, 0, 0, 1)',
-                    }}
-                    inert={isSmallScreen && sidebarExpanded ? '' : undefined}
+                  <ResizablePanelGroup
+                    orientation="horizontal"
+                    defaultLayout={defaultLayout}
+                    onLayoutChanged={onLayoutChanged}
+                    className="relative flex-1 bg-presentation"
                   >
-                    <Outlet />
-                  </div>
-                  <GraphPanel />
+                    <ResizablePanel defaultSize="72" minSize="30" id="main-view">
+                      <div
+                        className="relative flex h-full max-w-full flex-1 flex-col overflow-hidden"
+                        style={{
+                          transform:
+                            isSmallScreen && sidebarExpanded ? 'translateX(min(85vw, 380px))' : 'none',
+                          transition: 'transform 300ms cubic-bezier(0.2, 0, 0, 1)',
+                        }}
+                        inert={isSmallScreen && sidebarExpanded ? '' : undefined}
+                      >
+                        <Outlet />
+                      </div>
+                    </ResizablePanel>
+                    {!isSmallScreen && <GraphPanelContainer />}
+                  </ResizablePanelGroup>
                 </div>
             </PromptGroupsProvider>
           </AgentsMapContext.Provider>
