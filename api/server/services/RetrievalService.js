@@ -1,9 +1,17 @@
 const axios = require('axios');
+const GraphService = require('./GraphService');
 
 const BASE = process.env.RETRIEVAL_API_URL || process.env.RETRIEVAL_URL || '';
 
 if (!BASE) {
-  console.warn('RETRIEVAL_API_URL not set — RetrievalService requests will fail until configured.');
+  // No external retrieval backend configured. getNode/getNeighbors fall back
+  // to the local static demo graph in GraphService so the graph panel is
+  // still usable out of the box; search/ask/askStream still require BASE
+  // and will throw below since they have no local equivalent.
+  console.warn(
+    'RETRIEVAL_API_URL not set — search/ask requests will fail until configured. ' +
+      'getNode/getNeighbors will use the local demo graph as a fallback.',
+  );
 }
 
 const client = axios.create({
@@ -71,6 +79,9 @@ module.exports = {
   },
 
   async getNode(nodeId) {
+    if (!BASE) {
+      return GraphService.getNode(nodeId);
+    }
     try {
       const res = await client.get(`/graph/node/${encodeURIComponent(nodeId)}`);
       return res.data;
@@ -80,6 +91,9 @@ module.exports = {
   },
 
   async getNeighbors(nodeId, options = {}) {
+    if (!BASE) {
+      return GraphService.getNeighbors(nodeId, options);
+    }
     try {
       const res = await client.post(`/graph/node/${encodeURIComponent(nodeId)}/neighbors`, options);
       return res.data;
