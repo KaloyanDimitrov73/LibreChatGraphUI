@@ -31,7 +31,6 @@ const oauth = require('./oauth');
 const files = require('./files');
 const share = require('./share');
 const graph = require('./graph');
-const retrieval = require('./retrieval');
 const tags = require('./tags');
 const auth = require('./auth');
 const keys = require('./keys');
@@ -77,7 +76,6 @@ module.exports = {
   endpoints,
   assistants,
   categories,
-  retrieval,
   staticRoute,
   accessPermissions,
 };

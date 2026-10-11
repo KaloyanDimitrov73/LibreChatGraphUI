@@ -1,14 +1,6 @@
 import { useMemo } from 'react';
 import { MCPIcon, AttachmentIcon, OpenAIMinimalIcon } from '@librechat/client';
-import {
-  Bot,
-  Brain,
-  Bookmark,
-  NotebookPen,
-  ScrollText,
-  ArrowRightToLine,
-  SlidersHorizontal,
-} from 'lucide-react';
+import { ArrowRightToLine, SlidersHorizontal } from 'lucide-react';
 import {
   Permissions,
   EModelEndpoint,
@@ -19,21 +11,11 @@ import {
 } from 'librechat-data-provider';
 import type { TInterfaceConfig, TEndpointsConfig } from 'librechat-data-provider';
 import type { NavLink } from '~/common';
-import {
-  useAgentCapabilities,
-  useMCPServerManager,
-  useGetAgentsConfig,
-  useHasAccess,
-} from '~/hooks';
+import { useMCPServerManager, useHasAccess } from '~/hooks';
 import MCPBuilderPanel from '~/components/SidePanel/MCPBuilder/MCPBuilderPanel';
-import AgentPanelSwitch from '~/components/SidePanel/Agents/AgentPanelSwitch';
-import BookmarkPanel from '~/components/SidePanel/Bookmarks/BookmarkPanel';
 import PanelSwitch from '~/components/SidePanel/Builder/PanelSwitch';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
-import { MemoryPanel } from '~/components/SidePanel/Memories';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
-import { PromptsAccordion } from '~/components/Prompts';
-import { SkillsAccordion } from '~/components/Skills';
 
 export default function useSideNavLinks({
   hidePanel,
@@ -52,34 +34,6 @@ export default function useSideNavLinks({
   endpointsConfig: TEndpointsConfig;
   includeHidePanel?: boolean;
 }) {
-  const hasAccessToPrompts = useHasAccess({
-    permissionType: PermissionTypes.PROMPTS,
-    permission: Permissions.USE,
-  });
-  const hasAccessToSkills = useHasAccess({
-    permissionType: PermissionTypes.SKILLS,
-    permission: Permissions.USE,
-  });
-  const hasAccessToBookmarks = useHasAccess({
-    permissionType: PermissionTypes.BOOKMARKS,
-    permission: Permissions.USE,
-  });
-  const hasAccessToMemories = useHasAccess({
-    permissionType: PermissionTypes.MEMORIES,
-    permission: Permissions.USE,
-  });
-  const hasAccessToReadMemories = useHasAccess({
-    permissionType: PermissionTypes.MEMORIES,
-    permission: Permissions.READ,
-  });
-  const hasAccessToAgents = useHasAccess({
-    permissionType: PermissionTypes.AGENTS,
-    permission: Permissions.USE,
-  });
-  const hasAccessToCreateAgents = useHasAccess({
-    permissionType: PermissionTypes.AGENTS,
-    permission: Permissions.CREATE,
-  });
   const hasAccessToUseMCPSettings = useHasAccess({
     permissionType: PermissionTypes.MCP_SERVERS,
     permission: Permissions.USE,
@@ -90,26 +44,8 @@ export default function useSideNavLinks({
   });
   const { availableMCPServers } = useMCPServerManager();
 
-  const { agentsConfig } = useGetAgentsConfig({ endpointsConfig });
-  const { skillsEnabled } = useAgentCapabilities(agentsConfig?.capabilities);
-
   const Links = useMemo(() => {
     const links: NavLink[] = [];
-
-    if (
-      endpointsConfig?.[EModelEndpoint.agents] &&
-      hasAccessToAgents &&
-      hasAccessToCreateAgents &&
-      endpointsConfig[EModelEndpoint.agents].disableBuilder !== true
-    ) {
-      links.push({
-        title: 'com_sidepanel_agent_builder',
-        label: '',
-        icon: Bot,
-        id: EModelEndpoint.agents,
-        Component: AgentPanelSwitch,
-      });
-    }
 
     if (
       isAssistantsEndpoint(endpoint) &&
@@ -127,46 +63,6 @@ export default function useSideNavLinks({
         icon: OpenAIMinimalIcon,
         id: EModelEndpoint.assistants,
         Component: PanelSwitch,
-      });
-    }
-
-    if (hasAccessToSkills && skillsEnabled) {
-      links.push({
-        title: 'com_ui_skills',
-        label: '',
-        icon: ScrollText,
-        id: 'skills',
-        Component: SkillsAccordion,
-      });
-    }
-
-    if (hasAccessToPrompts) {
-      links.push({
-        title: 'com_ui_prompts',
-        label: '',
-        icon: NotebookPen,
-        id: 'prompts',
-        Component: PromptsAccordion,
-      });
-    }
-
-    if (hasAccessToMemories && hasAccessToReadMemories) {
-      links.push({
-        title: 'com_ui_memories',
-        label: '',
-        icon: Brain,
-        id: 'memories',
-        Component: MemoryPanel,
-      });
-    }
-
-    if (hasAccessToBookmarks) {
-      links.push({
-        title: 'com_sidepanel_conversation_tags',
-        label: '',
-        icon: Bookmark,
-        id: 'bookmarks',
-        Component: BookmarkPanel,
       });
     }
 
@@ -221,16 +117,8 @@ export default function useSideNavLinks({
     endpoint,
     endpointsConfig,
     keyProvided,
-    hasAccessToAgents,
-    hasAccessToCreateAgents,
-    hasAccessToPrompts,
-    hasAccessToSkills,
-    skillsEnabled,
-    hasAccessToMemories,
-    hasAccessToReadMemories,
     interfaceConfig.parameters,
     endpointType,
-    hasAccessToBookmarks,
     availableMCPServers,
     hasAccessToUseMCPSettings,
     hasAccessToCreateMCP,

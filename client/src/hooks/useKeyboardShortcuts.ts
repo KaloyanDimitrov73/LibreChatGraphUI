@@ -187,14 +187,6 @@ export const shortcutDefinitions = {
     ariaMac: 'Meta+Enter',
     ariaOther: 'Control+Enter',
   },
-  bookmarkConversation: {
-    labelKey: 'com_shortcut_bookmark_conversation',
-    groupKey: 'com_shortcut_group_navigation',
-    displayMac: '⌘ ⇧ B',
-    displayOther: 'Ctrl+Shift+B',
-    ariaMac: 'Meta+Shift+B',
-    ariaOther: 'Control+Shift+B',
-  },
   continueResponse: {
     labelKey: 'com_shortcut_continue_response',
     groupKey: 'com_shortcut_group_chat',
@@ -219,30 +211,6 @@ export const shortcutDefinitions = {
     ariaMac: '',
     ariaOther: '',
   },
-  openAgents: {
-    labelKey: 'com_shortcut_open_agents',
-    groupKey: 'com_shortcut_group_panels',
-    displayMac: '',
-    displayOther: '',
-    ariaMac: '',
-    ariaOther: '',
-  },
-  openPrompts: {
-    labelKey: 'com_shortcut_open_prompts',
-    groupKey: 'com_shortcut_group_panels',
-    displayMac: '',
-    displayOther: '',
-    ariaMac: '',
-    ariaOther: '',
-  },
-  openMemories: {
-    labelKey: 'com_shortcut_open_memories',
-    groupKey: 'com_shortcut_group_panels',
-    displayMac: '',
-    displayOther: '',
-    ariaMac: '',
-    ariaOther: '',
-  },
   openParameters: {
     labelKey: 'com_shortcut_open_parameters',
     groupKey: 'com_shortcut_group_panels',
@@ -253,14 +221,6 @@ export const shortcutDefinitions = {
   },
   openFiles: {
     labelKey: 'com_shortcut_open_files',
-    groupKey: 'com_shortcut_group_panels',
-    displayMac: '',
-    displayOther: '',
-    ariaMac: '',
-    ariaOther: '',
-  },
-  openBookmarks: {
-    labelKey: 'com_shortcut_open_bookmarks',
     groupKey: 'com_shortcut_group_panels',
     displayMac: '',
     displayOther: '',
@@ -682,8 +642,6 @@ export function useShortcutActions(): ShortcutAction[] {
     [],
   );
 
-  const handleBookmarkConversation = useCallback(() => clickElement('#bookmark-menu-button'), []);
-
   const handleOpenPanel = useCallback(
     (panelId: string) => {
       const activatePanel = () => {
@@ -717,12 +675,8 @@ export function useShortcutActions(): ShortcutAction[] {
   );
 
   const handleOpenAssistants = useCallback(() => handleOpenPanel('assistants'), [handleOpenPanel]);
-  const handleOpenAgents = useCallback(() => handleOpenPanel('agents'), [handleOpenPanel]);
-  const handleOpenPrompts = useCallback(() => handleOpenPanel('prompts'), [handleOpenPanel]);
-  const handleOpenMemories = useCallback(() => handleOpenPanel('memories'), [handleOpenPanel]);
   const handleOpenParameters = useCallback(() => handleOpenPanel('parameters'), [handleOpenPanel]);
   const handleOpenFiles = useCallback(() => handleOpenPanel('files'), [handleOpenPanel]);
-  const handleOpenBookmarks = useCallback(() => handleOpenPanel('bookmarks'), [handleOpenPanel]);
   const handleOpenMCP = useCallback(() => handleOpenPanel('mcp-builder'), [handleOpenPanel]);
 
   const handlers = useMemo<Record<ShortcutActionId, () => boolean | void>>(
@@ -746,16 +700,11 @@ export function useShortcutActions(): ShortcutAction[] {
       archiveConversation: handleArchiveConversation,
       deleteConversation: handleDeleteConversation,
       submitMessage: handleSubmitMessage,
-      bookmarkConversation: handleBookmarkConversation,
       continueResponse: handleContinueResponse,
       readAloudLastResponse: handleReadAloudLastResponse,
       openAssistants: handleOpenAssistants,
-      openAgents: handleOpenAgents,
-      openPrompts: handleOpenPrompts,
-      openMemories: handleOpenMemories,
       openParameters: handleOpenParameters,
       openFiles: handleOpenFiles,
-      openBookmarks: handleOpenBookmarks,
       openMCP: handleOpenMCP,
     }),
     [
@@ -778,16 +727,11 @@ export function useShortcutActions(): ShortcutAction[] {
       handleArchiveConversation,
       handleDeleteConversation,
       handleSubmitMessage,
-      handleBookmarkConversation,
       handleContinueResponse,
       handleReadAloudLastResponse,
       handleOpenAssistants,
-      handleOpenAgents,
-      handleOpenPrompts,
-      handleOpenMemories,
       handleOpenParameters,
       handleOpenFiles,
-      handleOpenBookmarks,
       handleOpenMCP,
     ],
   );

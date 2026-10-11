@@ -9,15 +9,30 @@ services:
     depends_on:
       - mongodb
       - rag_api
-    image: registry.librechat.ai/danny-avila/librechat-dev:latest
+    # Built from this repo (not the upstream librechat-dev image) so the
+    # graph panel, "View in graph" button, /api/graph routes and the trimmed
+    # sidebar are what actually runs. Rebuild after code changes with:
+    #   docker compose up -d --build api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: librechatgraphui-api:local
     restart: always
     user: "${UID}:${GID}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # "default" keeps every existing link to mongodb/meilisearch/rag_api/
+    # vectordb working unchanged. "librechat_shared" is the same external
+    # network joined by gc's backend service, so this container can reach
+    # it at http://gc-backend:8000 for the custom endpoint added below.
+    networks:
+      - default
+      - librechat_shared
     environment:
       - HOST=0.0.0.0
       - MONGO_URI=mongodb://mongodb:27017/LibreChat
       - MEILI_HOST=http://meilisearch:7700
+      - HUBLINK_API_URL=${HUBLINK_API_URL:-http://gc-backend:8000}
       - RAG_PORT=${RAG_PORT:-8000}
       - RAG_API_URL=http://rag_api:${RAG_PORT:-8000}
       - PROXY=${PROXY:-}
@@ -31,6 +46,13 @@ services:
       - type: bind
         source: ./.env
         target: /app/.env
+      # This file was not previously mounted, so librechat.yaml at the repo
+      # root had no effect. Required for the custom `HubLink` endpoint
+      # below to be picked up. Copy librechat.example.yaml to
+      # librechat.yaml first if you don't have one yet.
+      - type: bind
+        source: ./librechat.yaml
+        target: /app/librechat.yaml
       - ./images:/app/client/public/images
       - ./uploads:/app/uploads
       - ./logs:/app/logs
@@ -94,3 +116,13 @@ services:
 
 volumes:
   pgdata2:
+
+networks:
+  # Shared bridge network so this `api` container and gc's backend
+  # container can reach each other by container name. Create once, before
+  # starting either stack:
+  #   docker network create librechat_shared
+  # `external: true` tells Compose not to try to create/own this network
+  # itself, since it's shared between two independent compose projects.
+  librechat_shared:
+    external: true

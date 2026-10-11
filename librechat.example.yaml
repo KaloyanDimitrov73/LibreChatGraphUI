@@ -150,16 +150,19 @@ interface:
   modelSelect: true
   parameters: true
   presets: true
-  prompts:
-    use: true
-    create: true
-    share: false
-    public: false
-  bookmarks: true
+  # Prompts, Bookmarks, Memories, Skills and the Agent Builder are not part of
+  # the HubLink product; their sidebar panels were removed in the client and
+  # they are switched off here so they don't surface anywhere else either.
+  prompts: false
+  bookmarks: false
+  memories: false
+  skills: false
   multiConvo: true
+  # `use` stays on: custom endpoints such as HubLink run through LibreChat's
+  # agents pipeline as ephemeral agents. `create: false` removes the builder.
   agents:
     use: true
-    create: true
+    create: false
     share: false
     public: false
   peoplePicker:
@@ -649,6 +652,31 @@ endpoints:
       summaryModel: 'current_model'
       modelDisplayLabel: 'Portkey'
       iconURL: https://images.crunchbase.com/image/upload/c_pad,f_auto,q_auto:eco,dpr_1/rjqy7ghvjoiu4cd1xjbf
+
+    # gc's HubLink retrieval backend, reached through the OpenAI-compatible
+    # adapter at /v1/chat/completions and /v1/models. "gc-backend" is the
+    # network alias set in gc's docker-compose.yml.
+    - name: 'HubLink'
+      # HubLink doesn't check this key — LibreChat just requires a non-empty
+      # value to be present before it will call GET /v1/models.
+      apiKey: 'not-needed'
+      baseURL: 'http://gc-backend:8000/v1'
+      models:
+        # Fallback if the fetch fails; normally overwritten by whatever
+        # /v1/models returns (the OpenAI models in gc's llm_configs.json).
+        default: ['o3-mini']
+        fetch: true
+      headers:
+        # The id of the assistant message being generated. gc stores the
+        # retrieved graph under it, and the "View in graph" button under the
+        # answer loads it back via /api/graph/node/root?messageId=...
+        X-LibreChat-Message-Id: '{{LIBRECHAT_BODY_MESSAGEID}}'
+      # Off by default: HubLink's answers come from a real retrieval call,
+      # so using it to generate a quick conversation *title* would trigger
+      # a full (slow) retrieval just to produce a short title. Leave this
+      # false and LibreChat will fall back to its default titling instead.
+      titleConvo: false
+      modelDisplayLabel: 'HubLink (SciGraphChat)'
 
   # AWS Bedrock Example
   # Note: Bedrock endpoint is configured via environment variables

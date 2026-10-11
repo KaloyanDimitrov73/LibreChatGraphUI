@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Link2, X, Check } from 'lucide-react';
+import { request } from 'librechat-data-provider';
 import { emitGraphEvent } from '~/hooks/Graph/useGraphEvents';
 import './GraphPanel.css';
 
@@ -45,6 +46,7 @@ export default function GraphPanel({ open, context, onToggle, onNodeClick }: Gra
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const draggingRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
@@ -57,35 +59,46 @@ export default function GraphPanel({ open, context, onToggle, onNodeClick }: Gra
   // ---- Loading -----------------------------------------------------------
 
   const loadForContext = useCallback(async (ctx: GraphContext) => {
+    setError(null);
+    setNodes([]);
+    setEdges([]);
+    if (!ctx.messageId) {
+      setError('Open the graph from the "View in graph" button under an answer.');
+      return;
+    }
+    setLoading(true);
     try {
-      setError(null);
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ messageId: ctx.messageId });
       if (ctx.conversationId) params.set('conversationId', ctx.conversationId);
-      if (ctx.messageId) params.set('messageId', ctx.messageId);
-      const url = params.toString()
-        ? `/api/graph/node/root?${params.toString()}`
-        : '/api/graph/node/root';
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('Failed to load graph root');
-      const data = await resp.json();
+      const data = (await request.get(`/api/graph/node/root?${params.toString()}`)) as {
+        nodes?: Node[];
+        edges?: Edge[];
+      };
       const loadedNodes: Node[] = data.nodes || [];
-      setNodes((prev) =>
+      if (loadedNodes.length === 0) {
+        setError('HubLink did not return a graph for this answer.');
+      }
+      setNodes(
         loadedNodes.map((n, i) => {
-          const existing = prev.find((p) => p.id === n.id);
+          const angle = (2 * Math.PI * i) / Math.max(loadedNodes.length, 1);
           return {
             ...n,
-            x: existing?.x ?? n.x ?? WIDTH / 2 + Math.cos(i) * 120,
-            y: existing?.y ?? n.y ?? HEIGHT / 2 + Math.sin(i) * 120,
+            x: n.x ?? WIDTH / 2 + Math.cos(angle) * 140,
+            y: n.y ?? HEIGHT / 2 + Math.sin(angle) * 140,
             vx: 0,
             vy: 0,
           };
         }),
       );
       setEdges(data.edges || []);
-      emitGraphEvent('graph:data-loaded', { data });
+      emitGraphEvent('graph:data-loaded', {
+        data: { nodes: loadedNodes, edges: data.edges || [] },
+      });
     } catch (err) {
       console.error('GraphPanel loadForContext', err);
-      setError('Could not load the graph.');
+      setError('Could not load the graph from HubLink.');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -201,22 +214,8 @@ export default function GraphPanel({ open, context, onToggle, onNodeClick }: Gra
     );
   };
 
-  const handlePointerUp = async () => {
-    const drag = draggingRef.current;
+  const handlePointerUp = () => {
     draggingRef.current = null;
-    if (!drag) return;
-    const node = nodes.find((n) => n.id === drag.id);
-    if (!node) return;
-    try {
-      await fetch(`/api/graph/nodes/${encodeURIComponent(node.id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: node.x, y: node.y }),
-      });
-    } catch (err) {
-      // Non-fatal — position just won't persist across a reload.
-      console.warn('persist node position failed', err);
-    }
   };
 
   // ---- Node click / connect mode -------------------------------------------
@@ -231,41 +230,42 @@ export default function GraphPanel({ open, context, onToggle, onNodeClick }: Gra
     }
     setSelectedId(node.id);
     if (onNodeClick) onNodeClick(node);
-    emitGraphEvent('graph:node-click', { node: node as any });
+    emitGraphEvent('graph:node-click', { node });
   };
 
   // ---- Mutations -----------------------------------------------------------
+  // Edits are local to the graph currently open in the panel: they let the
+  // user annotate/rearrange what HubLink retrieved without altering ORKG.
 
-  const addNode = async () => {
+  const createEdge = (source: string, target: string) => {
+    if (edgesRef.current.some((e) => e.source === source && e.target === target)) {
+      setError('Those nodes are already connected.');
+      return;
+    }
+    setError(null);
+    setEdges((prev) => [...prev, { id: `local-edge-${Date.now()}`, source, target }]);
+  };
+
+  const addNode = () => {
     setError(null);
     const label = window.prompt('Label for the new node:');
     if (!label || !label.trim()) return;
-    try {
-      const resp = await fetch('/api/graph/nodes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          label: label.trim(),
-          x: WIDTH / 2 + (Math.random() - 0.5) * 80,
-          y: HEIGHT / 2 + (Math.random() - 0.5) * 80,
-        }),
-      });
-      if (!resp.ok) throw new Error('Failed to create node');
-      const node: Node = await resp.json();
-      setNodes((prev) => [
-        ...prev,
-        { ...node, x: node.x ?? WIDTH / 2, y: node.y ?? HEIGHT / 2, vx: 0, vy: 0 },
-      ]);
-      // If a node is already selected, link the new one to it — a quick
-      // way to build the graph up from the panel without switching modes.
-      if (selectedId) {
-        await createEdge(selectedId, node.id);
-      } else {
-        setSelectedId(node.id);
-      }
-    } catch (err) {
-      console.error('addNode failed', err);
-      setError('Could not create the node.');
+    const node: SimNode = {
+      id: `local-node-${Date.now()}`,
+      label: label.trim(),
+      type: 'custom',
+      x: WIDTH / 2 + (Math.random() - 0.5) * 80,
+      y: HEIGHT / 2 + (Math.random() - 0.5) * 80,
+      vx: 0,
+      vy: 0,
+    };
+    setNodes((prev) => [...prev, node]);
+    // If a node is already selected, link the new one to it — a quick
+    // way to build the graph up from the panel without switching modes.
+    if (selectedId) {
+      createEdge(selectedId, node.id);
+    } else {
+      setSelectedId(node.id);
     }
   };
 
@@ -274,80 +274,35 @@ export default function GraphPanel({ open, context, onToggle, onNodeClick }: Gra
     setEditValue(node.label);
   };
 
-  const commitRename = async () => {
+  const commitRename = () => {
     if (!editingId) return;
     const trimmed = editValue.trim();
     const id = editingId;
     setEditingId(null);
     if (!trimmed) return;
-    try {
-      const resp = await fetch(`/api/graph/nodes/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: trimmed }),
-      });
-      if (!resp.ok) throw new Error('Failed to rename node');
-      setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, label: trimmed } : n)));
-    } catch (err) {
-      console.error('rename node failed', err);
-      setError('Could not rename the node.');
-    }
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, label: trimmed } : n)));
   };
 
-  const deleteSelected = async () => {
+  const deleteSelected = () => {
     if (!selectedId) return;
     const id = selectedId;
-    try {
-      const resp = await fetch(`/api/graph/nodes/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      if (!resp.ok) throw new Error('Failed to delete node');
-      setNodes((prev) => prev.filter((n) => n.id !== id));
-      setEdges((prev) => prev.filter((e) => e.source !== id && e.target !== id));
-      setSelectedId(null);
-    } catch (err) {
-      console.error('delete node failed', err);
-      setError('Could not delete the node.');
-    }
+    setNodes((prev) => prev.filter((n) => n.id !== id));
+    setEdges((prev) => prev.filter((e) => e.source !== id && e.target !== id));
+    setSelectedId(null);
   };
 
-  const createEdge = async (source: string, target: string) => {
-    try {
-      const resp = await fetch('/api/graph/edges', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source, target }),
-      });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to create edge');
-      }
-      const edge: Edge = await resp.json();
-      setEdges((prev) => [...prev, edge]);
-    } catch (err) {
-      console.error('createEdge failed', err);
-      setError(err instanceof Error ? err.message : 'Could not connect those nodes.');
-    }
-  };
-
-  const deleteEdge = async (edgeId: string) => {
-    try {
-      const resp = await fetch(`/api/graph/edges/${encodeURIComponent(edgeId)}`, { method: 'DELETE' });
-      if (!resp.ok) throw new Error('Failed to delete edge');
-      setEdges((prev) => prev.filter((e) => e.id !== edgeId));
-    } catch (err) {
-      console.error('delete edge failed', err);
-      setError('Could not delete the connection.');
-    }
+  const deleteEdge = (edgeId: string) => {
+    setEdges((prev) => prev.filter((e) => e.id !== edgeId));
   };
 
   // ---- Load Neighbors --------------------------------------------------
 
   const loadNeighbors = async (nodeId: string) => {
     try {
-      const resp = await fetch(`/api/retrieval/node/${encodeURIComponent(nodeId)}/neighbors`, {
-        method: 'POST',
-      });
-      if (!resp.ok) throw new Error('Failed to load neighbors');
-      const data = await resp.json();
+      setError(null);
+      const data = (await request.post(
+        `/api/graph/node/${encodeURIComponent(nodeId)}/neighbors`,
+      )) as { nodes?: Node[]; edges?: Edge[] };
       setNodes((prev) => {
         const ids = new Set(prev.map((p) => p.id));
         const extras = (data.nodes || [])
@@ -389,7 +344,7 @@ export default function GraphPanel({ open, context, onToggle, onNodeClick }: Gra
               <Plus size={14} /> Add Node
             </button>
             <button
-              className={`graph-toolbar-btn${connectFrom ? ' active' : ''}`}
+              className={`graph-toolbar-btn${connectFrom ? 'active' : ''}`}
               onClick={() => setConnectFrom(connectFrom ? null : selectedId)}
               disabled={!selectedId && !connectFrom}
               title="Connect the selected node to another"
@@ -406,6 +361,7 @@ export default function GraphPanel({ open, context, onToggle, onNodeClick }: Gra
             </button>
           </div>
 
+          {loading && <div className="graph-loading">Loading graph…</div>}
           {error && <div className="graph-error">{error}</div>}
 
           <div className="graph-canvas-wrap">
@@ -541,7 +497,11 @@ export default function GraphPanel({ open, context, onToggle, onNodeClick }: Gra
                     <button onClick={commitRename} title="Save" aria-label="Save label">
                       <Check size={14} />
                     </button>
-                    <button onClick={() => setEditingId(null)} title="Cancel" aria-label="Cancel rename">
+                    <button
+                      onClick={() => setEditingId(null)}
+                      title="Cancel"
+                      aria-label="Cancel rename"
+                    >
                       <X size={14} />
                     </button>
                   </div>

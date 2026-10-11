@@ -263,7 +263,7 @@ const HoverButtons = ({
         <HoverButton
           onClick={() =>
             emitGraphEvent('chat:view-graph', {
-              conversationId: conversation.conversationId,
+              conversationId: conversation.conversationId ?? undefined,
               messageId: message.messageId,
             })
           }
