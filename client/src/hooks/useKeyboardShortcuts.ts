@@ -203,38 +203,6 @@ export const shortcutDefinitions = {
     ariaMac: 'Meta+Shift+V',
     ariaOther: 'Control+Shift+V',
   },
-  openAssistants: {
-    labelKey: 'com_shortcut_open_assistants',
-    groupKey: 'com_shortcut_group_panels',
-    displayMac: '',
-    displayOther: '',
-    ariaMac: '',
-    ariaOther: '',
-  },
-  openParameters: {
-    labelKey: 'com_shortcut_open_parameters',
-    groupKey: 'com_shortcut_group_panels',
-    displayMac: '',
-    displayOther: '',
-    ariaMac: '',
-    ariaOther: '',
-  },
-  openFiles: {
-    labelKey: 'com_shortcut_open_files',
-    groupKey: 'com_shortcut_group_panels',
-    displayMac: '',
-    displayOther: '',
-    ariaMac: '',
-    ariaOther: '',
-  },
-  openMCP: {
-    labelKey: 'com_shortcut_open_mcp',
-    groupKey: 'com_shortcut_group_panels',
-    displayMac: '',
-    displayOther: '',
-    ariaMac: '',
-    ariaOther: '',
-  },
 } as const satisfies Record<string, ShortcutDefinition>;
 
 export type ShortcutActionId = keyof typeof shortcutDefinitions;
@@ -642,43 +610,6 @@ export function useShortcutActions(): ShortcutAction[] {
     [],
   );
 
-  const handleOpenPanel = useCallback(
-    (panelId: string) => {
-      const activatePanel = () => {
-        const btn = document.querySelector<HTMLButtonElement>(
-          `[data-testid="nav-panel-${panelId}"]`,
-        );
-        if (!btn || isUnavailableElement(btn)) {
-          return false;
-        }
-        if (btn.getAttribute('aria-pressed') !== 'true') {
-          btn.click();
-          return true;
-        }
-        return false;
-      };
-
-      const btn = document.querySelector<HTMLButtonElement>(`[data-testid="nav-panel-${panelId}"]`);
-      if (!btn || isUnavailableElement(btn)) {
-        return false;
-      }
-
-      if (!sidebarExpanded) {
-        setSidebarExpanded(true);
-        setTimeout(activatePanel, 350);
-        return true;
-      }
-
-      return activatePanel();
-    },
-    [sidebarExpanded, setSidebarExpanded],
-  );
-
-  const handleOpenAssistants = useCallback(() => handleOpenPanel('assistants'), [handleOpenPanel]);
-  const handleOpenParameters = useCallback(() => handleOpenPanel('parameters'), [handleOpenPanel]);
-  const handleOpenFiles = useCallback(() => handleOpenPanel('files'), [handleOpenPanel]);
-  const handleOpenMCP = useCallback(() => handleOpenPanel('mcp-builder'), [handleOpenPanel]);
-
   const handlers = useMemo<Record<ShortcutActionId, () => boolean | void>>(
     () => ({
       showShortcuts: handleShowShortcuts,
@@ -702,10 +633,6 @@ export function useShortcutActions(): ShortcutAction[] {
       submitMessage: handleSubmitMessage,
       continueResponse: handleContinueResponse,
       readAloudLastResponse: handleReadAloudLastResponse,
-      openAssistants: handleOpenAssistants,
-      openParameters: handleOpenParameters,
-      openFiles: handleOpenFiles,
-      openMCP: handleOpenMCP,
     }),
     [
       handleShowShortcuts,
@@ -729,10 +656,6 @@ export function useShortcutActions(): ShortcutAction[] {
       handleSubmitMessage,
       handleContinueResponse,
       handleReadAloudLastResponse,
-      handleOpenAssistants,
-      handleOpenParameters,
-      handleOpenFiles,
-      handleOpenMCP,
     ],
   );
 

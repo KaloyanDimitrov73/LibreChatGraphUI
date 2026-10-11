@@ -98,7 +98,7 @@ interface:
   # Enable/disable file search as a chatarea selection (default: true)
   # Note: This setting does not disable the Agents File Search Capability.
   # To disable the Agents Capability, see the Agents Endpoint configuration instead.
-  fileSearch: true
+  fileSearch: false
   # Privacy policy settings
   privacyPolicy:
     externalUrl: 'https://librechat.ai/privacy-policy'
@@ -148,11 +148,17 @@ interface:
       By using the Website, you acknowledge that you have read these Terms of Service and agree to be bound by them.
 
   modelSelect: true
-  parameters: true
+  parameters: false
   presets: true
-  # Prompts, Bookmarks, Memories, Skills and the Agent Builder are not part of
-  # the HubLink product; their sidebar panels were removed in the client and
-  # they are switched off here so they don't surface anywhere else either.
+  # Prompts, Bookmarks, Memories, Skills, the Agent Builder, MCP, file
+  # attachments and model parameters are not part of the HubLink product; their
+  # sidebar panels were removed in the client and they are switched off here so
+  # they don't surface anywhere else (e.g. the chat input bar) either.
+  mcpServers:
+    use: false
+    create: false
+    share: false
+    public: false
   prompts: false
   bookmarks: false
   memories: false
@@ -391,6 +397,12 @@ actions:
 #       - /path/to/obsidian/vault
 
 # Definition of custom endpoints
+# HubLink answers from the knowledge graph only; uploads would be ignored.
+fileConfig:
+  endpoints:
+    HubLink:
+      disabled: true
+
 endpoints:
   # assistants:
   #   disableBuilder: false # Disable Assistants Builder Interface by setting to `true`
